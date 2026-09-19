@@ -1,16 +1,10 @@
 package com.jvzin.controle_servidor; import 
 org.springframework.web.bind.annotation.*; @RestController public class 
 ComandoController {
-    private String ultimoComando = "";
-    // ========================================================= STATUS 
-    // =========================================================
+    private String ultimoComando = ""; private boolean online = false; 
     private int bateria = -1; private String conexao = "desconhecida"; 
-    private long ultimaComunicacao = 0;
-    // ========================================================= 
-    // LOCALIZAÇÃO 
-    // =========================================================
     private double latitude = 0; private double longitude = 0; private 
-    float precisao = 0;
+    float precisao = 0; private long ultimaComunicacao = 0;
     // ========================================================= ENVIAR 
     // COMANDO =========================================================
     @PostMapping("/comando") public String enviarComando( @RequestParam 
@@ -36,8 +30,8 @@ ComandoController {
     // =========================================================
     @PostMapping("/status") public synchronized String atualizarStatus( 
             @RequestParam int bateria, @RequestParam String conexao
-    ) { this.bateria = bateria; this.conexao = conexao; 
-        this.ultimaComunicacao =
+    ) { this.online = true; this.bateria = bateria; this.conexao = 
+        conexao; this.ultimaComunicacao =
                 System.currentTimeMillis(); return "Status atualizado";
     }
     // ========================================================= 
@@ -69,13 +63,6 @@ ComandoController {
     @GetMapping("/localizacao") public synchronized LocalizacaoResponse 
     obterLocalizacao() {
         return new LocalizacaoResponse( latitude, longitude, precisao );
-    }
-    // ========================================================= ABRIR 
-    // LOCALIZAÇÃO NO GOOGLE MAPS 
-    // =========================================================
-    @GetMapping("/mapa") public synchronized String obterMapa() { return 
-        "https://www.google.com/maps?q="
-                + latitude + "," + longitude;
     }
     // ========================================================= 
     // RESPOSTA DO STATUS 
