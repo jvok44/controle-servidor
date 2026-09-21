@@ -2,7 +2,6 @@ package com.jvzin.controle_servidor;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -14,147 +13,48 @@ public class ComandoController {
 
     private final DispositivoService dispositivoService;
 
-    private final Map<String, EstadoDispositivo> dispositivos =
-            new ConcurrentHashMap<>();
+    private final EstadoDispositivo estado =
+            new EstadoDispositivo();
 
 
     public ComandoController(
             DispositivoService dispositivoService
     ) {
-
         this.dispositivoService =
                 dispositivoService;
     }
 
 
     // =========================================================
-    // ESTADO DO DISPOSITIVO
+    // VERIFICAR CÓDIGO
     // =========================================================
 
-    private EstadoDispositivo obterEstado(
-            String deviceId
+    private boolean codigoValido(
+            String codigo
     ) {
 
-        return dispositivos.computeIfAbsent(
-                deviceId,
-                id -> new EstadoDispositivo()
+        return dispositivoService.codigoValido(
+                codigo
         );
     }
 
 
     // =========================================================
-    // VERIFICAR SE É AUTENTICAÇÃO DO DISPOSITIVO
+    // ENVIAR COMANDO
     // =========================================================
 
-    private boolean ehDispositivo(
-            Authentication authentication,
-            String deviceId
-    ) {
-
-        if (authentication == null) {
-            return false;
-        }
-
-        return authentication
-                .getName()
-                .equals("DEVICE:" + deviceId);
-    }
-
-
-    // =========================================================
-    // VERIFICAR ACESSO DA CONTA
-    // =========================================================
-
-    private boolean usuarioTemAcesso(
-            Authentication authentication,
-            String deviceId
-    ) {
-
-        if (authentication == null) {
-            return false;
-        }
-
-
-        // Dispositivo não pode usar essa autorização
-        if (ehDispositivo(authentication, deviceId)) {
-            return false;
-        }
-
-
-        return dispositivoService.usuarioTemAcesso(
-                authentication.getName(),
-                deviceId
-        );
-    }
-
-
-    // =========================================================
-    // CONTA → ENVIAR COMANDO
-    // =========================================================
-
-    @PostMapping("/{deviceId}/comando")
+    @GetMapping("/comando")
     public ResponseEntity<?> enviarComando(
-            @PathVariable String deviceId,
-            @RequestParam String comando,
-            Authentication authentication
+            @RequestParam String codigo,
+            @RequestParam String comando
     ) {
 
-        if (!usuarioTemAcesso(
-                authentication,
-                deviceId
-        )) {
+        if (!codigoValido(codigo)) {
 
             return ResponseEntity
-                    .status(HttpStatus.FORBIDDEN)
-                    .body(
-                            "Você não tem acesso a este dispositivo"
-                    );
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body("Código inválido");
         }
-
-
-        EstadoDispositivo estado =
-                obterEstado(deviceId);
-
-
-        synchronized (estado) {
-
-            estado.ultimoComando =
-                    comando;
-        }
-
-
-        return ResponseEntity.ok(
-                "Comando recebido: " + comando
-        );
-    }
-
-
-    // =========================================================
-    // CONTA → ENVIAR COMANDO PELA URL
-    // =========================================================
-
-    @GetMapping("/{deviceId}/enviar")
-    public ResponseEntity<?> enviarComandoPelaUrl(
-            @PathVariable String deviceId,
-            @RequestParam String comando,
-            Authentication authentication
-    ) {
-
-        if (!usuarioTemAcesso(
-                authentication,
-                deviceId
-        )) {
-
-            return ResponseEntity
-                    .status(HttpStatus.FORBIDDEN)
-                    .body(
-                            "Você não tem acesso a este dispositivo"
-                    );
-        }
-
-
-        EstadoDispositivo estado =
-                obterEstado(deviceId);
 
 
         synchronized (estado) {
@@ -171,30 +71,20 @@ public class ComandoController {
 
 
     // =========================================================
-    // CELULAR → BUSCAR COMANDO
+    // CELULAR BUSCA COMANDO
     // =========================================================
 
-    @GetMapping("/{deviceId}/comando")
-    public ResponseEntity<?> obterComando(
-            @PathVariable String deviceId,
-            Authentication authentication
+    @GetMapping("/buscar-comando")
+    public ResponseEntity<?> buscarComando(
+            @RequestParam String codigo
     ) {
 
-        if (!ehDispositivo(
-                authentication,
-                deviceId
-        )) {
+        if (!codigoValido(codigo)) {
 
             return ResponseEntity
-                    .status(HttpStatus.FORBIDDEN)
-                    .body(
-                            "Apenas o dispositivo pode acessar esta rota"
-                    );
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body("Código inválido");
         }
-
-
-        EstadoDispositivo estado =
-                obterEstado(deviceId);
 
 
         synchronized (estado) {
@@ -202,10 +92,8 @@ public class ComandoController {
             String comando =
                     estado.ultimoComando;
 
-
             estado.ultimoComando =
                     "";
-
 
             return ResponseEntity.ok(
                     comando
@@ -215,32 +103,22 @@ public class ComandoController {
 
 
     // =========================================================
-    // CELULAR → ENVIAR STATUS
+    // ATUALIZAR STATUS
     // =========================================================
 
-    @PostMapping("/{deviceId}/status")
+    @PostMapping("/status")
     public ResponseEntity<?> atualizarStatus(
-            @PathVariable String deviceId,
+            @RequestParam String codigo,
             @RequestParam int bateria,
-            @RequestParam String conexao,
-            Authentication authentication
+            @RequestParam String conexao
     ) {
 
-        if (!ehDispositivo(
-                authentication,
-                deviceId
-        )) {
+        if (!codigoValido(codigo)) {
 
             return ResponseEntity
-                    .status(HttpStatus.FORBIDDEN)
-                    .body(
-                            "Apenas o dispositivo pode enviar seu status"
-                    );
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body("Código inválido");
         }
-
-
-        EstadoDispositivo estado =
-                obterEstado(deviceId);
 
 
         synchronized (estado) {
@@ -263,30 +141,20 @@ public class ComandoController {
 
 
     // =========================================================
-    // CONTA → CONSULTAR STATUS
+    // OBTER STATUS
     // =========================================================
 
-    @GetMapping("/{deviceId}/status")
+    @GetMapping("/status")
     public ResponseEntity<?> obterStatus(
-            @PathVariable String deviceId,
-            Authentication authentication
+            @RequestParam String codigo
     ) {
 
-        if (!usuarioTemAcesso(
-                authentication,
-                deviceId
-        )) {
+        if (!codigoValido(codigo)) {
 
             return ResponseEntity
-                    .status(HttpStatus.FORBIDDEN)
-                    .body(
-                            "Você não tem acesso a este dispositivo"
-                    );
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body("Código inválido");
         }
-
-
-        EstadoDispositivo estado =
-                obterEstado(deviceId);
 
 
         synchronized (estado) {
@@ -295,15 +163,15 @@ public class ComandoController {
                     System.currentTimeMillis();
 
 
-            boolean celularOnline =
+            boolean online =
                     estado.ultimaComunicacao > 0
-                    &&
+                            &&
                     agora - estado.ultimaComunicacao < 15000;
 
 
             return ResponseEntity.ok(
                     new StatusResponse(
-                            celularOnline,
+                            online,
                             estado.bateria,
                             estado.conexao,
                             estado.ultimaComunicacao
@@ -314,33 +182,23 @@ public class ComandoController {
 
 
     // =========================================================
-    // CELULAR → ENVIAR LOCALIZAÇÃO
+    // ATUALIZAR LOCALIZAÇÃO
     // =========================================================
 
-    @PostMapping("/{deviceId}/localizacao")
+    @PostMapping("/localizacao")
     public ResponseEntity<?> atualizarLocalizacao(
-            @PathVariable String deviceId,
+            @RequestParam String codigo,
             @RequestParam double latitude,
             @RequestParam double longitude,
-            @RequestParam float precisao,
-            Authentication authentication
+            @RequestParam float precisao
     ) {
 
-        if (!ehDispositivo(
-                authentication,
-                deviceId
-        )) {
+        if (!codigoValido(codigo)) {
 
             return ResponseEntity
-                    .status(HttpStatus.FORBIDDEN)
-                    .body(
-                            "Apenas o dispositivo pode enviar sua localização"
-                    );
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body("Código inválido");
         }
-
-
-        EstadoDispositivo estado =
-                obterEstado(deviceId);
 
 
         synchronized (estado) {
@@ -366,30 +224,20 @@ public class ComandoController {
 
 
     // =========================================================
-    // CONTA → CONSULTAR LOCALIZAÇÃO
+    // OBTER LOCALIZAÇÃO
     // =========================================================
 
-    @GetMapping("/{deviceId}/localizacao")
+    @GetMapping("/localizacao")
     public ResponseEntity<?> obterLocalizacao(
-            @PathVariable String deviceId,
-            Authentication authentication
+            @RequestParam String codigo
     ) {
 
-        if (!usuarioTemAcesso(
-                authentication,
-                deviceId
-        )) {
+        if (!codigoValido(codigo)) {
 
             return ResponseEntity
-                    .status(HttpStatus.FORBIDDEN)
-                    .body(
-                            "Você não tem acesso a este dispositivo"
-                    );
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body("Código inválido");
         }
-
-
-        EstadoDispositivo estado =
-                obterEstado(deviceId);
 
 
         synchronized (estado) {
@@ -406,7 +254,7 @@ public class ComandoController {
 
 
     // =========================================================
-    // ESTADO INTERNO
+    // ESTADO DO CELULAR
     // =========================================================
 
     private static class EstadoDispositivo {
@@ -415,7 +263,8 @@ public class ComandoController {
 
         int bateria = -1;
 
-        String conexao = "desconhecida";
+        String conexao =
+                "desconhecida";
 
         double latitude = 0;
 
@@ -428,7 +277,7 @@ public class ComandoController {
 
 
     // =========================================================
-    // RESPOSTA DO STATUS
+    // RESPOSTA STATUS
     // =========================================================
 
     public static class StatusResponse {
@@ -465,7 +314,7 @@ public class ComandoController {
 
 
     // =========================================================
-    // RESPOSTA DA LOCALIZAÇÃO
+    // RESPOSTA LOCALIZAÇÃO
     // =========================================================
 
     public static class LocalizacaoResponse {
